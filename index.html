@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Compra e Venda</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#00c853"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Compra e Venda"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<style>
+:root{--bg:#050a05;--surface:#0d150d;--surface2:#142014;--border:#1e3a1e;--accent:#00c853;--accent2:#69f0ae;--gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32;--green:#00e676;--red:#ff5252;--text:#e8f5e9;--muted:#4a7a4a;--radius:16px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+h1,h2,h3,h4{font-family:'Syne',sans-serif;}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading p{color:var(--muted);font-size:.9rem;}
+#auth-screen{min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 30% 20%,#00c85330 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,#00e67620 0%,transparent 60%),var(--bg);}
+.auth-logo-img{margin-bottom:16px;filter:drop-shadow(0 0 20px #00e67655);}
+.auth-sub{color:var(--muted);margin-bottom:32px;font-size:.85rem;letter-spacing:2px;text-transform:uppercase;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:400px;}
+.auth-tabs{display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:24px;}
+.auth-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:600;font-size:.9rem;transition:.2s;}
+.auth-tab.active{background:var(--accent);color:#000;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px;font-weight:500;}
+.field input,.field select,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.95rem;outline:none;transition:.2s;appearance:none;-webkit-appearance:none;}
+.field input:focus,.field select:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #00c85322;}
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;transition:.2s;}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.auth-error{color:var(--red);font-size:.85rem;margin-top:10px;text-align:center;display:none;}
+#app{display:none;flex-direction:column;min-height:100vh;}
+.top-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;color:var(--accent);}
+.user-chip{display:flex;align-items:center;gap:8px;}
+.avatar{width:34px;height:34px;border-radius:50%;border:2px solid var(--accent);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;overflow:hidden;flex-shrink:0;color:var(--text);}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px 0 10px;cursor:pointer;color:var(--muted);transition:.2s;gap:4px;border:none;background:none;}
+.nav-item.active{color:var(--accent);}
+.nav-item svg{width:22px;height:22px;}
+.nav-item span{font-size:.7rem;font-weight:500;}
+.page{display:none;padding:14px 14px 96px;}
+.page.active{display:block;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
+.section-title{font-size:.95rem;font-weight:700;margin-bottom:12px;}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.stat-label{font-size:.72rem;color:var(--muted);margin-bottom:4px;}
+.stat-value{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;}
+.stat-value.green{color:var(--green);}
+.stat-value.accent{color:var(--accent);}
+.stat-value.red{color:var(--red);}
+.stat-value.gold{color:var(--gold);}
+.meta-bar-bg{background:var(--surface2);border-radius:999px;height:9px;overflow:hidden;}
+.meta-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .6s ease;}
+.meta-info{display:flex;justify-content:space-between;font-size:.76rem;color:var(--muted);margin-top:6px;}
+.meta-input-row{display:flex;gap:8px;margin-top:10px;}
+.meta-input-row input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:.88rem;outline:none;}
+.btn-sm{padding:9px 14px;background:var(--accent);border:none;border-radius:8px;color:#000;font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-full{grid-column:1/-1;}
+.product-item{background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.product-info{flex:1;min-width:0;}
+.product-name{font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.product-meta{font-size:.73rem;color:var(--muted);margin-top:2px;}
+.product-values{text-align:right;flex-shrink:0;}
+.product-lucro{font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;}
+.product-lucro.pos{color:var(--green);}
+.product-lucro.neg{color:var(--red);}
+.badge-status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:600;margin-top:3px;}
+.badge-status.disponivel{background:#00c85322;color:var(--accent);}
+.badge-status.vendido{background:#69f0ae22;color:var(--accent2);}
+.product-actions{display:flex;gap:4px;margin-top:5px;justify-content:flex-end;}
+.btn-icon{padding:5px 8px;border-radius:7px;border:none;cursor:pointer;font-size:.72rem;font-weight:600;}
+.btn-sell{background:#00c85322;color:var(--accent);}
+.btn-del{background:#ff525222;color:var(--red);}
+.sub-tabs{display:flex;gap:6px;margin-bottom:14px;}
+.sub-tab{padding:7px 16px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.82rem;font-weight:500;transition:.2s;}
+.sub-tab.active{background:var(--accent);border-color:var(--accent);color:#000;}
+.rank-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface2);border-radius:12px;margin-bottom:8px;}
+.rank-pos{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;min-width:26px;text-align:center;}
+.rank-pos.p1{color:var(--gold);}
+.rank-pos.p2{color:var(--silver);}
+.rank-pos.p3{color:var(--bronze);}
+.rank-avatar{width:42px;height:42px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem;border:2px solid var(--border);overflow:hidden;flex-shrink:0;color:var(--text);}
+.rank-avatar img{width:100%;height:100%;object-fit:cover;}
+.rank-info{flex:1;}
+.rank-name{font-weight:600;font-size:.88rem;}
+.rank-fat{font-family:'Syne',sans-serif;font-weight:700;color:var(--green);font-size:.95rem;}
+.perfil-header{display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px 0;}
+.perfil-avatar{width:86px;height:86px;border-radius:50%;background:var(--surface2);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;overflow:hidden;cursor:pointer;color:var(--text);}
+.perfil-avatar img{width:100%;height:100%;object-fit:cover;}
+.btn-danger{width:100%;padding:12px;background:#ff525222;border:1px solid var(--red);border-radius:10px;color:var(--red);font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;margin-top:8px;transition:.2s;}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-outline{width:100%;padding:12px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;margin-top:8px;transition:.2s;}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.modal-overlay{display:none;position:fixed;inset:0;background:#0009;z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:400px;}
+.modal h3{font-family:'Syne',sans-serif;font-size:1.1rem;margin-bottom:14px;}
+.modal-actions{display:flex;gap:10px;margin-top:16px;}
+.modal-actions button{flex:1;}
+.empty{text-align:center;padding:32px 20px;color:var(--muted);font-size:.86rem;}
+#toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:10px 22px;font-size:.84rem;z-index:300;opacity:0;transition:.3s;white-space:nowrap;pointer-events:none;}
+#toast.show{opacity:1;}
+/* CROP MODAL */
+#crop-modal{display:none;position:fixed;inset:0;background:#000d;z-index:500;flex-direction:column;align-items:center;justify-content:center;padding:16px;}
+#crop-modal.open{display:flex;}
+#crop-container{width:100%;max-width:400px;max-height:60vh;overflow:hidden;border-radius:12px;background:#000;}
+#crop-container img{max-width:100%;display:block;}
+.crop-actions{display:flex;gap:10px;margin-top:16px;width:100%;max-width:400px;}
+.crop-actions button{flex:1;padding:13px;border-radius:10px;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;cursor:pointer;}
+.btn-crop-cancel{background:var(--surface2);color:var(--muted);}
+.btn-crop-save{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="80" height="80" style="filter:drop-shadow(0 0 16px #00e67666)">
+    <defs>
+      <linearGradient id="lbg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0a0a0a"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient>
+      <linearGradient id="lcg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00e676"/><stop offset="100%" stop-color="#00b248"/></linearGradient>
+      <filter id="lg"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect width="400" height="400" fill="url(#lbg)" rx="60"/>
+    <circle cx="200" cy="200" r="140" fill="url(#lcg)"/>
+    <circle cx="200" cy="200" r="112" fill="#00000033"/>
+    <ellipse cx="200" cy="225" rx="42" ry="14" fill="#ffffff22"/>
+    <ellipse cx="200" cy="210" rx="42" ry="14" fill="#ffffff44"/>
+    <ellipse cx="200" cy="195" rx="42" ry="14" fill="#ffffffcc"/>
+    <polygon points="200,145 228,177 214,177 214,193 186,193 186,177 172,177" fill="white" filter="url(#lg)"/>
+  </svg>
+  <div class="spinner"></div>
+  <p>Carregando...</p>
+</div>
+
+<div id="auth-screen">
+  <div class="auth-logo-img">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="120" height="120">
+      <defs>
+        <linearGradient id="abg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0a0a0a"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient>
+        <linearGradient id="acg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00e676"/><stop offset="100%" stop-color="#00b248"/></linearGradient>
+        <filter id="agl"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="ash"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#00e676" flood-opacity="0.3"/></filter>
+      </defs>
+      <rect width="400" height="400" fill="url(#abg)" rx="40"/>
+      <circle cx="200" cy="170" r="105" fill="none" stroke="#00e67633" stroke-width="2"/>
+      <circle cx="200" cy="170" r="90" fill="url(#acg)" filter="url(#ash)"/>
+      <circle cx="200" cy="170" r="72" fill="#00000033"/>
+      <ellipse cx="200" cy="195" rx="28" ry="10" fill="#ffffff22"/>
+      <ellipse cx="200" cy="185" rx="28" ry="10" fill="#ffffff33"/>
+      <ellipse cx="200" cy="175" rx="28" ry="10" fill="#ffffff44"/>
+      <rect x="172" y="175" width="56" height="10" fill="#ffffff44"/>
+      <ellipse cx="200" cy="165" rx="28" ry="10" fill="#ffffffcc"/>
+      <polygon points="200,125 222,150 211,150 211,163 189,163 189,150 178,150" fill="white" filter="url(#agl)"/>
+      <text x="200" y="298" font-family="Arial Black,sans-serif" font-size="28" font-weight="900" fill="white" text-anchor="middle">COMPRA E</text>
+      <text x="200" y="332" font-family="Arial Black,sans-serif" font-size="28" font-weight="900" fill="url(#acg)" text-anchor="middle">VENDA</text>
+      <text x="200" y="360" font-family="monospace" font-size="11" fill="#666" text-anchor="middle" letter-spacing="3">RASTREADOR DE MARGENS</text>
+    </svg>
+  </div>
+  <p class="auth-sub">Rastreador de Margens</p>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuth('login')">Entrar</button>
+      <button class="auth-tab" onclick="switchAuth('cadastro')">Cadastrar</button>
+    </div>
+    <div id="form-login">
+      <div class="field"><label>Email ou usuário</label><input type="text" id="login-id" placeholder="email ou @usuario"/></div>
+      <div class="field"><label>Senha</label><input type="password" id="login-pass" placeholder="••••••"/></div>
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">Entrar</button>
+    </div>
+    <div id="form-cadastro" style="display:none">
+      <div class="field"><label>Nome de usuário</label><input type="text" id="cad-user" placeholder="ex: joaosilva"/></div>
+      <div class="field"><label>Email</label><input type="email" id="cad-email" placeholder="email@exemplo.com"/></div>
+      <div class="field"><label>Senha</label><input type="password" id="cad-pass" placeholder="Mínimo 6 caracteres"/></div>
+      <button class="btn-primary" id="btn-cad" onclick="doCadastro()">Criar conta</button>
+    </div>
+    <p class="auth-error" id="auth-error"></p>
+  </div>
+</div>
+
+<div id="app">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="30" height="30" style="border-radius:7px">
+        <defs>
+          <linearGradient id="tbg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0a0a0a"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient>
+          <linearGradient id="tcg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00e676"/><stop offset="100%" stop-color="#00b248"/></linearGradient>
+          <filter id="tgl"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect width="400" height="400" fill="url(#tbg)" rx="60"/>
+        <circle cx="200" cy="200" r="140" fill="url(#tcg)"/>
+        <circle cx="200" cy="200" r="112" fill="#00000033"/>
+        <ellipse cx="200" cy="220" rx="40" ry="14" fill="#ffffff22"/>
+        <ellipse cx="200" cy="205" rx="40" ry="14" fill="#ffffff44"/>
+        <ellipse cx="200" cy="190" rx="40" ry="14" fill="#ffffffcc"/>
+        <polygon points="200,145 226,175 213,175 213,188 187,188 187,175 174,175" fill="white" filter="url(#tgl)"/>
+      </svg>
+      <span class="logo">Compra e Venda</span>
+    </div>
+    <div class="user-chip">
+      <div class="avatar" id="topbar-avatar"></div>
+      <span id="topbar-name" style="font-size:.82rem;font-weight:600;"></span>
+    </div>
+  </div>
+
+  <div class="page active" id="page-pessoal">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="50" height="50" style="flex-shrink:0;filter:drop-shadow(0 0 10px #00e67666)">
+        <defs>
+          <linearGradient id="plbg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0a0a0a"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient>
+          <linearGradient id="plcg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00e676"/><stop offset="100%" stop-color="#00b248"/></linearGradient>
+          <filter id="plgl"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect width="400" height="400" fill="url(#plbg)" rx="60"/>
+        <circle cx="200" cy="200" r="140" fill="url(#plcg)"/>
+        <circle cx="200" cy="200" r="112" fill="#00000033"/>
+        <ellipse cx="200" cy="225" rx="42" ry="14" fill="#ffffff22"/>
+        <ellipse cx="200" cy="210" rx="42" ry="14" fill="#ffffff44"/>
+        <ellipse cx="200" cy="195" rx="42" ry="14" fill="#ffffffcc"/>
+        <polygon points="200,145 228,177 214,177 214,193 186,193 186,177 172,177" fill="white" filter="url(#plgl)"/>
+      </svg>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;color:var(--accent)">Compra e Venda</div>
+        <div style="font-size:.68rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase">Rastreador de Margens</div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Meu Painel</h2>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">💰 Investido</div><div class="stat-value accent" id="s-investido">R$ 0,00</div></div>
+      <div class="stat-card"><div class="stat-label">📈 Faturamento</div><div class="stat-value gold" id="s-faturamento">R$ 0,00</div></div>
+      <div class="stat-card"><div class="stat-label">✅ Lucro</div><div class="stat-value green" id="s-lucro">R$ 0,00</div></div>
+      <div class="stat-card"><div class="stat-label">📦 Produtos</div><div class="stat-value" id="s-qtd">0</div></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-weight:600;font-size:.88rem;">🎯 Meta Mensal</span>
+        <span id="meta-pct" style="font-size:.82rem;color:var(--accent);font-weight:700;"></span>
+      </div>
+      <div class="meta-bar-bg"><div class="meta-bar-fill" id="meta-bar" style="width:0%"></div></div>
+      <div class="meta-info"><span id="meta-atual">R$ 0,00 faturados</span><span id="meta-total">Meta: R$ 0,00</span></div>
+      <div class="meta-input-row">
+        <input type="number" id="meta-input" placeholder="Definir meta (R$)" min="0"/>
+        <button class="btn-sm" onclick="salvarMeta()">Salvar</button>
+      </div>
+    </div>
+
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="subTab('ativos',this)">Ativos</button>
+      <button class="sub-tab" onclick="subTab('historico',this)">Histórico</button>
+    </div>
+
+    <div id="subtab-ativos">
+      <div class="card">
+        <div class="section-title">➕ Cadastrar Produto</div>
+        <div class="form-grid">
+          <div class="field form-full"><label>Nome do produto</label><input type="text" id="p-nome" placeholder="Ex: iPhone 13"/></div>
+          <div class="field"><label>Onde comprei</label>
+            <select id="p-origem">
+              <option value="">Selecione</option>
+              <option value="Marketplace">Marketplace</option>
+              <option value="Shopee">Shopee</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div class="field"><label>Categoria</label>
+            <select id="p-cat">
+              <option value="">Selecione</option>
+              <option value="Eletrônicos">Eletrônicos</option>
+              <option value="Eletrodomésticos">Eletrodomésticos</option>
+              <option value="Automóveis/Moto">Automóveis/Moto</option>
+              <option value="Imóveis">Imóveis</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div class="field"><label>Valor investido (R$)</label><input type="number" id="p-invest" placeholder="0,00" min="0" step="0.01"/></div>
+          <div class="field"><label>Valor de venda (R$)</label><input type="number" id="p-venda" placeholder="0,00" min="0" step="0.01"/></div>
+        </div>
+        <button class="btn-primary" style="margin-top:8px" id="btn-cadastrar" onclick="cadastrarProduto()">Cadastrar</button>
+      </div>
+      <div class="section-title">📦 Produtos Ativos</div>
+      <div id="lista-ativos"><div class="empty">Nenhum produto ativo ainda.</div></div>
+    </div>
+
+    <div id="subtab-historico" style="display:none">
+      <div class="section-title">✅ Produtos Vendidos</div>
+      <div id="lista-historico"><div class="empty">Nenhuma venda registrada ainda.</div></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-ranking">
+    <h2 class="section-title">🏆 Ranking de Faturamento</h2>
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="rankTab(7,this)">7 dias</button>
+      <button class="sub-tab" onclick="rankTab(15,this)">15 dias</button>
+      <button class="sub-tab" onclick="rankTab(30,this)">30 dias</button>
+    </div>
+    <div id="ranking-list"><div class="empty">Carregando...</div></div>
+  </div>
+
+  <div class="page" id="page-perfil">
+    <div class="perfil-header">
+      <div class="perfil-avatar" id="perfil-avatar-wrap" onclick="document.getElementById('foto-input').click()">?</div>
+      <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="uploadFoto(event)"/>
+      <div style="text-align:center">
+        <div style="font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:700;" id="perfil-displayname"></div>
+        <div style="color:var(--muted);font-size:.82rem;" id="perfil-email"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Editar Perfil</div>
+      <div class="field"><label>Nome de usuário</label><input type="text" id="edit-user" placeholder="novousuario"/></div>
+      <div class="field"><label>Nova senha (deixe vazio para manter)</label><input type="password" id="edit-pass" placeholder="••••••"/></div>
+      <button class="btn-primary" onclick="salvarPerfil()">Salvar alterações</button>
+    </div>
+    <button class="btn-outline" onclick="doLogout()">Sair da conta</button>
+    <button class="btn-danger" onclick="confirmarExcluir()">⚠️ Excluir todos os meus dados</button>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="goPage('pessoal',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Pessoal</span>
+    </button>
+    <button class="nav-item" onclick="goPage('ranking',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      <span>Ranking</span>
+    </button>
+    <button class="nav-item" onclick="goPage('perfil',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span>Perfil</span>
+    </button>
+  </nav>
+</div>
+
+<div class="modal-overlay" id="modal-excluir">
+  <div class="modal">
+    <h3>⚠️ Excluir dados</h3>
+    <p style="color:var(--muted);font-size:.88rem;line-height:1.6">Todos os seus produtos e dados serão apagados permanentemente. Você poderá criar uma nova conta depois.</p>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('modal-excluir')">Cancelar</button>
+      <button class="btn-danger" style="margin-top:0" onclick="excluirConta()">Excluir tudo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- CROP MODAL -->
+<div id="crop-modal">
+  <div style="color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:12px;">✂️ Recortar foto</div>
+  <div id="crop-container"><img id="crop-image" src=""/></div>
+  <div class="crop-actions">
+    <button class="btn-crop-cancel" onclick="cancelCrop()">Cancelar</button>
+    <button class="btn-crop-save" onclick="saveCrop()">Salvar foto</button>
+  </div>
+</div>
+
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyD6jK3GnZj1gf0Su6xtOP333CcWYDpydzA",
+  authDomain:"compra-e-revenda-baa89.firebaseapp.com",
+  projectId:"compra-e-revenda-baa89",
+  storageBucket:"compra-e-revenda-baa89.firebasestorage.app",
+  messagingSenderId:"683400373412",
+  appId:"1:683400373412:web:79d34152f913bca2903231"
+});
+const auth=firebase.auth();
+const db=firebase.firestore();
+
+let currentUser=null,currentUserData=null,myProducts=[],currentRankDias=7,unsubProducts=null;
+
+function fmt(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function showError(msg){const el=document.getElementById('auth-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',5000);}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function ini(name){return(name||'?')[0].toUpperCase();}
+
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUser=user;
+    try{await loadUserData();}catch(e){console.error(e);}
+    document.getElementById('loading').style.display='none';
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app').style.cssText='display:flex;flex-direction:column;';
+    renderTopbar();renderPerfil();startListener();renderRanking(7);
+  }else{
+    currentUser=null;currentUserData=null;myProducts=[];
+    if(unsubProducts){unsubProducts();unsubProducts=null;}
+    document.getElementById('loading').style.display='none';
+    document.getElementById('auth-screen').style.display='flex';
+    document.getElementById('app').style.display='none';
+  }
+});
+
+async function loadUserData(){
+  const snap=await db.collection('users').doc(currentUser.uid).get();
+  if(snap.exists){currentUserData=snap.data();}
+  else{
+    const u=currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g,'');
+    currentUserData={uid:currentUser.uid,email:currentUser.email,username:u,foto:null,meta:0};
+    await db.collection('users').doc(currentUser.uid).set(currentUserData);
+  }
+}
+
+function switchAuth(tab){
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',tab==='login'?i===0:i===1));
+  document.getElementById('form-login').style.display=tab==='login'?'block':'none';
+  document.getElementById('form-cadastro').style.display=tab==='cadastro'?'block':'none';
+  document.getElementById('auth-error').style.display='none';
+}
+
+async function doLogin(){
+  const id=document.getElementById('login-id').value.trim().toLowerCase();
+  const pass=document.getElementById('login-pass').value;
+  if(!id||!pass)return showError('Preencha todos os campos.');
+  const btn=document.getElementById('btn-login');
+  btn.disabled=true;btn.textContent='Entrando...';
+  try{
+    let email=id;
+    if(!id.includes('@')||id.startsWith('@')){
+      const username=id.replace('@','');
+      const snap=await db.collection('users').where('username','==',username).limit(1).get();
+      if(snap.empty){showError('Usuário não encontrado.');btn.disabled=false;btn.textContent='Entrar';return;}
+      email=snap.docs[0].data().email;
+    }
+    await auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){
+    const msgs={'auth/user-not-found':'Usuário não encontrado.','auth/wrong-password':'Senha incorreta.','auth/invalid-credential':'Email ou senha incorretos.','auth/invalid-email':'Email inválido.'};
+    showError(msgs[e.code]||'Email/usuário ou senha incorretos.');
+    btn.disabled=false;btn.textContent='Entrar';
+  }
+}
+
+async function doCadastro(){
+  const username=document.getElementById('cad-user').value.trim().replace('@','').toLowerCase();
+  const email=document.getElementById('cad-email').value.trim().toLowerCase();
+  const pass=document.getElementById('cad-pass').value;
+  if(!username||!email||!pass)return showError('Preencha todos os campos.');
+  if(pass.length<6)return showError('Senha precisa ter ao menos 6 caracteres.');
+  if(!/^[a-zA-Z0-9_]+$/.test(username))return showError('Usuário: só letras, números e _');
+  const btn=document.getElementById('btn-cad');
+  btn.disabled=true;btn.textContent='Criando...';
+  try{
+    const snap=await db.collection('users').where('username','==',username).limit(1).get();
+    if(!snap.empty){showError('Esse usuário já existe.');btn.disabled=false;btn.textContent='Criar conta';return;}
+    const cred=await auth.createUserWithEmailAndPassword(email,pass);
+    await db.collection('users').doc(cred.user.uid).set({uid:cred.user.uid,email,username,foto:null,meta:0,createdAt:Date.now()});
+  }catch(e){
+    const msgs={'auth/email-already-in-use':'Esse email já está cadastrado.','auth/invalid-email':'Email inválido.','auth/weak-password':'Senha muito fraca.'};
+    showError(msgs[e.code]||'Erro: '+e.message);
+    btn.disabled=false;btn.textContent='Criar conta';
+  }
+}
+
+function doLogout(){auth.signOut();}
+
+function renderTopbar(){
+  if(!currentUserData)return;
+  const av=document.getElementById('topbar-avatar');
+  av.innerHTML=currentUserData.foto?`<img src="${currentUserData.foto}"/>`:ini(currentUserData.username);
+  document.getElementById('topbar-name').textContent='@'+currentUserData.username;
+}
+
+function startListener(){
+  if(unsubProducts)unsubProducts();
+  unsubProducts=db.collection('products').where('userId','==',currentUser.uid)
+    .onSnapshot(snap=>{
+      myProducts=snap.docs.map(d=>({id:d.id,...d.data()}));
+      myProducts.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      renderStats();renderMeta();renderAtivos();renderHistorico();
+    },err=>{
+      console.error('Listener error:',err.code,err.message);
+      toast('Erro ao carregar produtos. Recarregue a página.');
+    });
+}
+
+function renderStats(){
+  const v=myProducts.filter(p=>p.status==='vendido');
+  const inv=myProducts.reduce((s,p)=>s+Number(p.invest||0),0);
+  const fat=v.reduce((s,p)=>s+Number(p.venda||0),0);
+  const lucro=fat-v.reduce((s,p)=>s+Number(p.invest||0),0);
+  document.getElementById('s-investido').textContent=fmt(inv);
+  document.getElementById('s-faturamento').textContent=fmt(fat);
+  document.getElementById('s-lucro').textContent=fmt(lucro);
+  document.getElementById('s-lucro').className='stat-value '+(lucro>=0?'green':'red');
+  document.getElementById('s-qtd').textContent=myProducts.length;
+}
+
+function renderMeta(){
+  if(!currentUserData)return;
+  const meta=Number(currentUserData.meta||0);
+  const fat=myProducts.filter(p=>p.status==='vendido').reduce((s,p)=>s+Number(p.venda||0),0);
+  const pct=meta>0?Math.min(100,(fat/meta)*100):0;
+  document.getElementById('meta-bar').style.width=pct+'%';
+  document.getElementById('meta-pct').textContent=meta>0?Math.round(pct)+'%':'';
+  document.getElementById('meta-atual').textContent=fmt(fat)+' faturados';
+  document.getElementById('meta-total').textContent='Meta: '+fmt(meta);
+  if(meta>0)document.getElementById('meta-input').value=meta;
+}
+
+async function salvarMeta(){
+  const val=Number(document.getElementById('meta-input').value);
+  if(isNaN(val)||val<0)return toast('Valor inválido');
+  await db.collection('users').doc(currentUser.uid).update({meta:val});
+  currentUserData.meta=val;renderMeta();toast('Meta salva! 🎯');
+}
+
+function subTab(tab,el){
+  document.querySelectorAll('#page-pessoal .sub-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('subtab-ativos').style.display=tab==='ativos'?'block':'none';
+  document.getElementById('subtab-historico').style.display=tab==='historico'?'block':'none';
+}
+
+async function cadastrarProduto(){
+  const nome=document.getElementById('p-nome').value.trim();
+  const origem=document.getElementById('p-origem').value;
+  const cat=document.getElementById('p-cat').value;
+  const invest=parseFloat(document.getElementById('p-invest').value);
+  const venda=parseFloat(document.getElementById('p-venda').value);
+  if(!nome)return toast('Digite o nome do produto!');
+  if(!origem)return toast('Selecione onde comprou!');
+  if(!cat)return toast('Selecione a categoria!');
+  if(isNaN(invest)||invest<0)return toast('Digite o valor investido!');
+  if(isNaN(venda)||venda<0)return toast('Digite o valor de venda!');
+  const btn=document.getElementById('btn-cadastrar');
+  btn.disabled=true;btn.textContent='Cadastrando...';
+  try{
+    await db.collection('products').add({userId:currentUser.uid,nome,origem,cat,invest,venda,status:'disponivel',createdAt:Date.now(),soldAt:null});
+    document.getElementById('p-nome').value='';
+    document.getElementById('p-invest').value='';
+    document.getElementById('p-venda').value='';
+    document.getElementById('p-origem').value='';
+    document.getElementById('p-cat').value='';
+    toast('Produto cadastrado! 📦');
+  }catch(e){toast('Erro ao cadastrar: '+e.message);}
+  btn.disabled=false;btn.textContent='Cadastrar';
+}
+
+function renderAtivos(){
+  const ativos=myProducts.filter(p=>p.status==='disponivel');
+  const el=document.getElementById('lista-ativos');
+  if(!ativos.length){el.innerHTML='<div class="empty">Nenhum produto ativo ainda.</div>';return;}
+  el.innerHTML=ativos.map(p=>{
+    const lucro=p.venda-p.invest;
+    return `<div class="product-item">
+      <div class="product-info">
+        <div class="product-name">${p.nome}</div>
+        <div class="product-meta">${p.cat} • ${p.origem}</div>
+        <span class="badge-status disponivel">Disponível</span>
+      </div>
+      <div class="product-values">
+        <div style="font-size:.7rem;color:var(--muted)">Invest: ${fmt(p.invest)}</div>
+        <div style="font-size:.7rem;color:var(--muted)">Venda: ${fmt(p.venda)}</div>
+        <div class="product-lucro ${lucro>=0?'pos':'neg'}">${fmt(lucro)}</div>
+        <div class="product-actions">
+          <button class="btn-icon btn-sell" onclick="venderProd('${p.id}')">✅ Vendido</button>
+          <button class="btn-icon btn-del" onclick="deletarProd('${p.id}')">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistorico(){
+  const vendidos=myProducts.filter(p=>p.status==='vendido');
+  const el=document.getElementById('lista-historico');
+  if(!vendidos.length){el.innerHTML='<div class="empty">Nenhuma venda registrada ainda.</div>';return;}
+  el.innerHTML=vendidos.map(p=>{
+    const lucro=p.venda-p.invest;
+    return `<div class="product-item">
+      <div class="product-info">
+        <div class="product-name">${p.nome}</div>
+        <div class="product-meta">${p.cat} • ${p.origem}</div>
+        <span class="badge-status vendido">Vendido</span>
+      </div>
+      <div class="product-values">
+        <div style="font-size:.7rem;color:var(--muted)">Invest: ${fmt(p.invest)}</div>
+        <div style="font-size:.7rem;color:var(--muted)">Venda: ${fmt(p.venda)}</div>
+        <div class="product-lucro ${lucro>=0?'pos':'neg'}">${fmt(lucro)}</div>
+        <button class="btn-icon btn-del" style="margin-top:5px" onclick="deletarProd('${p.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function venderProd(id){
+  try{await db.collection('products').doc(id).update({status:'vendido',soldAt:Date.now()});toast('Marcado como vendido! 🎉');renderRanking(currentRankDias);}
+  catch(e){toast('Erro: '+e.message);}
+}
+
+async function deletarProd(id){
+  try{await db.collection('products').doc(id).delete();toast('Produto removido.');}
+  catch(e){toast('Erro: '+e.message);}
+}
+
+function rankTab(dias,el){
+  currentRankDias=dias;
+  document.querySelectorAll('#page-ranking .sub-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderRanking(dias);
+}
+
+async function renderRanking(dias){
+  const el=document.getElementById('ranking-list');
+  el.innerHTML='<div class="empty">Carregando...</div>';
+  try{
+    const cutoff=Date.now()-dias*86400000;
+    const snap=await db.collection('products').where('status','==','vendido').get();
+    const totals={};
+    snap.docs.forEach(d=>{
+      const p=d.data();
+      if((p.soldAt||0)>=cutoff){
+        totals[p.userId]=(totals[p.userId]||0)+Number(p.venda||0);
+      }
+    });
+    if(!Object.keys(totals).length){el.innerHTML='<div class="empty">Nenhuma venda nesse período ainda.</div>';return;}
+    const uids=Object.keys(totals);
+    const userSnaps=await Promise.all(uids.map(uid=>db.collection('users').doc(uid).get()));
+    const ranks=userSnaps.filter(s=>s.exists).map(s=>({...s.data(),fat:totals[s.id]})).sort((a,b)=>b.fat-a.fat);
+    const badges=['🥇','🥈','🥉'];
+    el.innerHTML=ranks.map((u,i)=>{
+      const posClass=i===0?'p1':i===1?'p2':i===2?'p3':'';
+      const crown=i<3?`<span style="margin-left:4px">${badges[i]}</span>`:'';
+      return `<div class="rank-item">
+        <div class="rank-pos ${posClass}">${i+1}</div>
+        <div class="rank-avatar">${u.foto?`<img src="${u.foto}"/>`:ini(u.username)}</div>
+        <div class="rank-info">
+          <div class="rank-name">@${u.username}${crown}</div>
+          <div class="rank-fat">${fmt(u.fat)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    console.error('Ranking error:',e);
+    el.innerHTML='<div class="empty">Erro no ranking: '+e.message+'</div>';
+  }
+}
+
+function renderPerfil(){
+  if(!currentUserData)return;
+  const el=document.getElementById('perfil-avatar-wrap');
+  el.innerHTML=currentUserData.foto?`<img src="${currentUserData.foto}"/>`:ini(currentUserData.username);
+  document.getElementById('perfil-displayname').textContent='@'+currentUserData.username;
+  document.getElementById('perfil-email').textContent=currentUserData.email;
+  document.getElementById('edit-user').value=currentUserData.username;
+}
+
+let cropper = null;
+
+function uploadFoto(e){
+  const file=e.target.files[0]; if(!file) return;
+  if(file.size>30*1024*1024){toast('Foto muito grande (máx 30MB)');return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=document.getElementById('crop-image');
+    img.src=ev.target.result;
+    document.getElementById('crop-modal').classList.add('open');
+    if(cropper){cropper.destroy();cropper=null;}
+    setTimeout(()=>{
+      cropper=new Cropper(img,{aspectRatio:1,viewMode:1,autoCropArea:1,movable:true,zoomable:true,rotatable:false});
+    },100);
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function cancelCrop(){
+  document.getElementById('crop-modal').classList.remove('open');
+  if(cropper){cropper.destroy();cropper=null;}
+}
+
+async function saveCrop(){
+  if(!cropper) return;
+  const canvas=cropper.getCroppedCanvas({width:400,height:400,imageSmoothingQuality:'high'});
+  const dataUrl=canvas.toDataURL('image/jpeg',0.85);
+  cancelCrop();
+  try{
+    await db.collection('users').doc(currentUser.uid).update({foto:dataUrl});
+    currentUserData.foto=dataUrl;
+    renderTopbar(); renderPerfil();
+    toast('Foto atualizada! 📸');
+  }catch(e){toast('Erro ao salvar foto.');}
+}
+
+async function salvarPerfil(){
+  const username=document.getElementById('edit-user').value.trim().toLowerCase();
+  const pass=document.getElementById('edit-pass').value;
+  if(!username)return toast('Usuário não pode ser vazio.');
+  if(!/^[a-zA-Z0-9_]+$/.test(username))return toast('Usuário: só letras, números e _');
+  try{
+    const snap=await db.collection('users').where('username','==',username).limit(1).get();
+    if(!snap.empty&&snap.docs[0].id!==currentUser.uid)return toast('Esse usuário já existe.');
+    await db.collection('users').doc(currentUser.uid).update({username});
+    currentUserData.username=username;
+    if(pass){
+      if(pass.length<6)return toast('Senha precisa ter 6+ caracteres.');
+      await currentUser.updatePassword(pass).catch(e=>{
+        if(e.code==='auth/requires-recent-login')toast('Faça login novamente para alterar a senha.');
+      });
+    }
+    renderTopbar();renderPerfil();toast('Perfil atualizado! ✅');
+  }catch(e){toast('Erro: '+e.message);}
+}
+
+function confirmarExcluir(){document.getElementById('modal-excluir').classList.add('open');}
+
+async function excluirConta(){
+  try{
+    const prods=await db.collection('products').where('userId','==',currentUser.uid).get();
+    const batch=db.batch();
+    prods.docs.forEach(d=>batch.delete(d.ref));
+    batch.delete(db.collection('users').doc(currentUser.uid));
+    await batch.commit();
+    await currentUser.delete();
+    closeModal('modal-excluir');
+  }catch(e){
+    if(e.code==='auth/requires-recent-login')toast('Faça login novamente para excluir.');
+    else toast('Erro: '+e.message);
+    closeModal('modal-excluir');
+  }
+}
+
+function goPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+  if(name==='ranking')renderRanking(currentRankDias);
+  if(name==='perfil')renderPerfil();
+}
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+</script>
+</body>
+</html>
